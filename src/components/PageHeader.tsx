@@ -19,15 +19,15 @@ export default function PageHeader({ title, subtitle, action, backButton = false
         {backButton && (
           <button 
             onClick={() => router.back()}
-            className="w-10 h-10 rounded-full bg-surface border border-border flex items-center justify-center text-muted hover:text-soft-white hover:bg-surface-hover transition-colors btn-press"
+            className="w-10 h-10 rounded-full bg-surface border border-border flex items-center justify-center text-muted hover:text-bone hover:bg-surface-hover hover:border-bone/20 transition-colors btn-press"
             aria-label="Go back"
           >
             ←
           </button>
         )}
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-soft-white">{title}</h1>
-          {subtitle && <p className="text-muted mt-1">{subtitle}</p>}
+          <h1 className="text-3xl font-bold tracking-tight text-bone font-editorial">{title}</h1>
+          {subtitle && <p className="text-muted mt-1 text-sm">{subtitle}</p>}
         </div>
       </div>
       {action && <div>{action}</div>}

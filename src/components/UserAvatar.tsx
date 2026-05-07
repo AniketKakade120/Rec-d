@@ -1,41 +1,42 @@
 'use client';
 
+const AVATAR_COLORS = [
+  'bg-brick text-bone',
+  'bg-[#1a2d3d] text-bone',
+  'bg-[#1a2d1a] text-bone',
+  'bg-[#2d1a2d] text-bone',
+  'bg-[#2d2510] text-bone',
+  'bg-warm-grey text-bone',
+];
+
 interface UserAvatarProps {
   name: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  avatarUrl?: string;
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
 }
 
-const AVATAR_COLORS = [
-  'from-electric to-purple',
-  'from-pink to-purple',
-  'from-cyan to-electric',
-  'from-yellow to-pink',
-  'from-purple to-pink',
-  'from-electric to-cyan',
-];
-
-function getColorForName(name: string): string {
-  const index = name.charCodeAt(0) % AVATAR_COLORS.length;
-  return AVATAR_COLORS[index];
-}
-
-const sizes = {
-  sm: 'w-8 h-8 text-xs',
-  md: 'w-10 h-10 text-sm',
-  lg: 'w-12 h-12 text-base',
-  xl: 'w-16 h-16 text-lg',
+const SIZES = {
+  xs: 'w-5 h-5 text-xs',
+  sm: 'w-7 h-7 text-xs',
+  md: 'w-9 h-9 text-xs',
+  lg: 'w-11 h-11 text-sm',
+  xl: 'w-16 h-16 text-xl',
 };
 
-export default function UserAvatar({ name, size = 'md', className = '' }: UserAvatarProps) {
-  const color = getColorForName(name);
-  const initials = name.charAt(0).toUpperCase();
+export default function UserAvatar({ name, avatarUrl, size = 'md', className = '' }: UserAvatarProps) {
+  const initials = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+  const colorClass = AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
+
+  if (avatarUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={avatarUrl} alt={name} className={`${SIZES[size]} rounded-full object-cover ${className}`} />
+    );
+  }
 
   return (
-    <div
-      className={`bg-gradient-to-br ${color} rounded-full flex items-center justify-center font-semibold text-white shrink-0 ${sizes[size]} ${className}`}
-      aria-label={`${name}'s avatar`}
-    >
+    <div className={`${SIZES[size]} ${colorClass} rounded-full flex items-center justify-center font-bold shrink-0 ${className}`}>
       {initials}
     </div>
   );

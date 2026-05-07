@@ -3,210 +3,247 @@
 import { useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
-import { REACTION_TAGS, ReactionTag } from '@/lib/types';
-import PageHeader from '@/components/PageHeader';
-import GlassCard from '@/components/GlassCard';
-import RatingStars from '@/components/RatingStars';
-import ReactionChip from '@/components/ReactionChip';
-import RecommendationCard from '@/components/RecommendationCard';
-import EmptyState from '@/components/EmptyState';
+import { REC_ACCURACY_OPTIONS, type RecAccuracy, CORE_STAMPS, type StampType } from '@/lib/types';
+import StampBadge from '@/components/StampBadge';
+import UserAvatar from '@/components/UserAvatar';
+
+const STATUS_STEPS = ['Recommended', 'Accepted', 'Watching', 'Watched', 'Rated'];
+const STATUS_ORDER: Record<string, number> = {
+  pending: 0, accepted: 1, maybe_later: 1, not_my_vibe: 1, watching: 2, watched: 3, rated: 4,
+};
 
 export default function RecommendationDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
+  const { id } = use(params);
   const router = useRouter();
-  const { recommendations, updateRecommendationStatus, addRating, currentUser } = useApp();
-  
-  const [ratingStep, setRatingStep] = useState(0); // 0 = not rating, 1 = star rating, 2 = reaction & submit
-  const [movieRating, setMovieRating] = useState(0);
-  const [accuracyRating, setAccuracyRating] = useState(0);
-  const [reaction, setReaction] = useState<ReactionTag | null>(null);
+  const { recommendations, updateRecommendationStatus, addRating, currentUser, getTitle, getUser } = useApp();
+
+  const [ratingStep, setRatingStep] = useState(0);
+  const [contentRating, setContentRating] = useState(0);
+  const [recAccuracy, setRecAccuracy] = useState<RecAccuracy | null>(null);
+  const [selectedStamp, setSelectedStamp] = useState<StampType | null>(null);
   const [comment, setComment] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [nudgeSent, setNudgeSent] = useState(false);
 
-  const rec = recommendations.find(r => r.id === resolvedParams.id);
+  const rec = recommendations.find(r => r.id === id);
+  if (!rec) return (
+    <div className="py-20 text-center">
+      <p className="text-muted">Recommendation not found.</p>
+    </div>
+  );
 
-  if (!rec) {
-    return <EmptyState title="Not Found" description="This recommendation could not be found." />;
-  }
+  const title = getTitle(rec.titleId);
+  const recommender = getUser(rec.recommendedBy);
+  const isReceiver = rec.recommendedToUserIds?.includes(currentUser?.id || '');
+  const isSender = currentUser?.id === rec.recommendedBy;
+  const currentStep = STATUS_ORDER[rec.status] ?? 0;
 
-  const isReceiver = currentUser?.id === rec.recommended_to_user_id;
-  const isSender = currentUser?.id === rec.recommended_by;
-  
-  const handleUpdateStatus = (status: any) => {
+  const updateStatus = (status: 'accepted' | 'maybe_later' | 'not_my_vibe' | 'watching' | 'watched') =>
     updateRecommendationStatus(rec.id, status);
-  };
 
-  const handleSubmitRating = () => {
-    if (!currentUser || !reaction || movieRating === 0 || accuracyRating === 0) return;
-    
-    setIsSubmitting(true);
+  const submitRating = () => {
+    if (!currentUser || !recAccuracy || contentRating === 0) return;
+    setSubmitting(true);
     setTimeout(() => {
       addRating({
-        id: `rating-${Date.now()}`,
-        recommendation_id: rec.id,
-        rated_by: currentUser.id,
-        movie_rating: movieRating,
-        recommendation_accuracy: accuracyRating,
-        reaction_tag: reaction,
-        comment: comment.trim() || undefined,
-        created_at: new Date().toISOString(),
+        id: `rating-${Date.now()}`, recommendationId: rec.id, ratedBy: currentUser.id,
+        contentRating, recommendationResult: recAccuracy, stamp: selectedStamp || undefined,
+        comment: comment.trim() || undefined, createdAt: new Date().toISOString(),
       });
       router.push('/home');
-    }, 1000);
+    }, 900);
   };
 
   return (
-    <div className="space-y-8 max-w-2xl mx-auto">
-      <PageHeader title="Recommendation Detail" backButton />
-      
-      {ratingStep === 0 && (
-        <div className="page-enter">
-          <RecommendationCard recommendation={rec} />
-          
-          {isReceiver && rec.status === 'pending' && (
-            <GlassCard className="mt-6 flex flex-col gap-3">
-              <h3 className="font-bold">What's your verdict?</h3>
-              <div className="grid grid-cols-2 gap-3">
-                <button 
-                  onClick={() => handleUpdateStatus('accepted')}
-                  className="py-3 bg-electric text-white font-medium rounded-xl btn-press"
-                >
-                  Accept Challenge
-                </button>
-                <button 
-                  onClick={() => handleUpdateStatus('rejected')}
-                  className="py-3 bg-surface border border-border text-soft-white font-medium rounded-xl btn-press"
-                >
-                  Not my vibe
-                </button>
-              </div>
-            </GlassCard>
-          )}
+    <div className="max-w-2xl mx-auto space-y-6">
+      <button onClick={() => router.back()} className="flex items-center gap-1.5 text-muted hover:text-bone text-sm transition-colors">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="15 18 9 12 15 6"/></svg>
+        Back
+      </button>
 
-          {isReceiver && rec.status === 'accepted' && (
-            <div className="mt-6">
-              <button 
-                onClick={() => handleUpdateStatus('watching')}
-                className="w-full py-4 bg-purple text-white font-bold rounded-xl btn-press text-lg"
-              >
-                Mark as Watching 👀
-              </button>
+      {/* Hero poster */}
+      {title && (
+        <div className={`rounded-2xl poster-gradient-${title.posterGradient} relative overflow-hidden min-h-[200px] flex flex-col justify-end border border-border`}>
+          <div className="absolute inset-0 poster-overlay-strong" />
+          <div className="relative z-10 p-6">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <h1 className="text-3xl font-bold text-bone font-editorial leading-tight">{title.title}</h1>
+              {rec.primaryStamp && <StampBadge stamp={rec.primaryStamp} size="md" variant="filled" />}
             </div>
-          )}
+            <p className="text-xs text-muted">{title.releaseYear} · {title.format} · {title.genres.slice(0, 2).join(', ')} {title.runtime && `· ${title.runtime}`}</p>
+          </div>
+        </div>
+      )}
 
-          {isReceiver && rec.status === 'watching' && (
-            <div className="mt-6">
-              <button 
-                onClick={() => handleUpdateStatus('watched')}
-                className="w-full py-4 bg-cyan text-ink font-bold rounded-xl btn-press text-lg shadow-[0_0_20px_rgba(34,211,238,0.3)]"
-              >
-                I've Watched It! ✓
-              </button>
+      {/* Recommender + context */}
+      {recommender && (
+        <div className="rounded-2xl bg-surface border border-border p-4 flex items-start gap-3">
+          <UserAvatar name={recommender.displayName} size="md" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-muted mb-0.5">Recommended by</p>
+            <p className="font-bold text-sm text-bone mb-1">{recommender.displayName}</p>
+            {rec.reason && <p className="text-sm text-bone/70 italic">&ldquo;{rec.reason}&rdquo;</p>}
+          </div>
+          {rec.tasteMatchScore && (
+            <div className="text-center shrink-0">
+              <p className="text-lg font-bold text-cinema-red">{rec.tasteMatchScore}%</p>
+              <p className="text-sm text-muted">match</p>
             </div>
-          )}
-
-          {isReceiver && rec.status === 'watched' && (
-            <div className="mt-6">
-              <button 
-                onClick={() => setRatingStep(1)}
-                className="w-full py-4 bg-gradient-to-r from-pink to-purple text-white font-bold rounded-xl btn-press text-lg shadow-lg shadow-pink/20"
-              >
-                Rate Recommendation Now
-              </button>
-            </div>
-          )}
-          
-          {isSender && (
-            <GlassCard className="mt-6">
-              <h3 className="font-bold mb-2">Recommendation Evidence</h3>
-              <p className="text-sm text-muted">You sent this. Wait for their verdict to see how your Taste Score changes.</p>
-            </GlassCard>
           )}
         </div>
       )}
 
-      {ratingStep === 1 && (
-        <div className="page-enter space-y-8">
-          <GlassCard glow="blue">
-            <h3 className="text-xl font-bold mb-6 text-center">Rate the Content</h3>
-            <div className="flex flex-col items-center gap-4">
-              <RatingStars value={movieRating} onChange={setMovieRating} size="lg" />
-              <p className="text-muted text-sm text-center max-w-xs">
-                How good was the movie/show itself, regardless of whether it fit your taste?
-              </p>
+      {/* Status timeline */}
+      <div className="rounded-2xl bg-surface border border-border p-5">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted mb-4">Journey</p>
+        <div className="flex items-center gap-1">
+          {STATUS_STEPS.map((step, i) => (
+            <div key={step} className="flex items-center flex-1 last:flex-none">
+              <div className={`flex flex-col items-center gap-1 ${i <= currentStep ? 'opacity-100' : 'opacity-30'}`}>
+                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-sm font-bold transition-colors ${
+                  i < currentStep ? 'border-cinema-red bg-cinema-red text-bone'
+                  : i === currentStep ? 'border-cinema-red text-cinema-red'
+                  : 'border-border text-muted'
+                }`}>
+                  {i < currentStep ? '✓' : i + 1}
+                </div>
+                <p className="text-xs text-muted text-center leading-tight w-12">{step}</p>
+              </div>
+              {i < STATUS_STEPS.length - 1 && (
+                <div className={`flex-1 h-px mx-1 mb-4 transition-colors ${i < currentStep ? 'bg-cinema-red' : 'bg-border'}`} />
+              )}
             </div>
-          </GlassCard>
+          ))}
+        </div>
+      </div>
 
-          <GlassCard glow="purple">
-            <h3 className="text-xl font-bold mb-6 text-center">Rate the Accuracy</h3>
-            <div className="flex flex-col items-center gap-4">
-              <RatingStars value={accuracyRating} onChange={setAccuracyRating} size="lg" />
-              <p className="text-muted text-sm text-center max-w-xs">
-                Did they cook? How well did this recommendation match your actual taste?
-              </p>
-              <div className="w-full max-w-xs mt-2 text-center h-6 text-sm font-bold text-electric">
-                {accuracyRating === 1 && 'Never recommend again'}
-                {accuracyRating === 2 && 'You tried'}
-                {accuracyRating === 3 && 'Mid but I see the vision'}
-                {accuracyRating === 4 && 'Solid read'}
-                {accuracyRating === 5 && 'You get me'}
+      {/* Receiver actions */}
+      {ratingStep === 0 && (
+        <>
+          {isReceiver && rec.status === 'pending' && (
+            <div className="rounded-2xl bg-surface border border-border p-5">
+              <h3 className="font-bold text-bone mb-3">What&apos;s your verdict?</h3>
+              <div className="grid grid-cols-3 gap-2">
+                <button onClick={() => updateStatus('accepted')} className="py-2.5 bg-cinema-red text-bone text-xs font-bold rounded-xl btn-press hover:bg-cinema-red/90">Accept</button>
+                <button onClick={() => updateStatus('maybe_later')} className="py-2.5 bg-surface-hover border border-border text-muted text-xs font-medium rounded-xl btn-press hover:text-bone">Maybe later</button>
+                <button onClick={() => updateStatus('not_my_vibe')} className="py-2.5 bg-surface-hover border border-border text-muted text-xs font-medium rounded-xl btn-press hover:text-bone">Not my vibe</button>
               </div>
             </div>
-          </GlassCard>
+          )}
 
-          <div className="flex justify-end pt-4">
-            <button 
-              onClick={() => setRatingStep(2)}
-              disabled={movieRating === 0 || accuracyRating === 0}
-              className="px-8 py-3 bg-electric text-white font-bold rounded-xl disabled:opacity-50 btn-press"
-            >
+          {isReceiver && rec.status === 'accepted' && (
+            <button onClick={() => updateStatus('watching')} className="w-full py-3.5 bg-surface border border-border text-bone font-semibold rounded-xl btn-press hover:bg-surface-hover text-sm">
+              Mark as Watching
+            </button>
+          )}
+
+          {isReceiver && rec.status === 'watching' && (
+            <button onClick={() => updateStatus('watched')} className="w-full py-3.5 bg-cinema-red text-bone font-bold rounded-xl btn-press text-sm hover:bg-cinema-red/90">
+              I&apos;ve Watched It ✓
+            </button>
+          )}
+
+          {isReceiver && rec.status === 'watched' && (
+            <button onClick={() => setRatingStep(1)} className="w-full py-3.5 bg-cinema-red text-bone font-bold rounded-xl btn-press text-sm hover:bg-cinema-red/90">
+              Rate this rec
+            </button>
+          )}
+
+          {isSender && (
+            <div className="rounded-2xl bg-surface border border-border p-5">
+              <h3 className="font-bold text-bone mb-1">Waiting for verdict.</h3>
+              <p className="text-sm text-muted mb-3">Their rating will update your Taste Score.</p>
+              {!nudgeSent ? (
+                <button onClick={() => setNudgeSent(true)}
+                  className="px-4 py-2 bg-surface-hover border border-border text-bone/70 text-xs font-medium rounded-lg hover:bg-warm-grey btn-press transition-colors">
+                  Send gentle nudge
+                </button>
+              ) : (
+                <p className="text-xs text-cinema-red">Still waiting for the verdict.</p>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Rating step 1: Content */}
+      {ratingStep === 1 && (
+        <div className="rounded-2xl bg-surface border border-border p-6 space-y-4 page-enter">
+          <h3 className="text-lg font-bold text-bone text-center font-editorial">How was the movie/show?</h3>
+          <p className="text-xs text-muted text-center">Rate the content itself.</p>
+          <div className="flex justify-center gap-2">
+            {[1,2,3,4,5].map(star => (
+              <button key={star} onClick={() => setContentRating(star)}
+                className={`text-3xl transition-all btn-press ${star <= contentRating ? 'text-cinema-red scale-110' : 'text-muted/30 hover:text-muted/60'}`}>
+                ★
+              </button>
+            ))}
+          </div>
+          <div className="flex justify-end pt-2">
+            <button onClick={() => setRatingStep(2)} disabled={contentRating === 0}
+              className="px-6 py-2.5 bg-cinema-red text-bone font-semibold rounded-xl disabled:opacity-40 btn-press text-sm">
               Continue
             </button>
           </div>
         </div>
       )}
 
+      {/* Rating step 2: Rec accuracy */}
       {ratingStep === 2 && (
-        <div className="page-enter space-y-8">
-          <GlassCard glow="pink">
-            <h3 className="text-xl font-bold mb-4">Choose a Verdict Tag</h3>
+        <div className="rounded-2xl bg-surface border border-border p-6 space-y-4 page-enter">
+          <h3 className="text-lg font-bold text-bone text-center font-editorial">Was this a good rec for you?</h3>
+          <p className="text-xs text-muted text-center">How well did they read your taste?</p>
+          <div className="flex justify-center gap-3 flex-wrap">
+            {REC_ACCURACY_OPTIONS.map(opt => (
+              <button key={opt} onClick={() => setRecAccuracy(opt)}
+                className={`px-5 py-3 rounded-xl border text-sm font-semibold btn-press transition-all ${
+                  recAccuracy === opt ? 'bg-cinema-red/15 border-cinema-red/50 text-bone' : 'bg-ink border-border text-muted hover:text-bone'
+                }`}>
+                {opt}
+              </button>
+            ))}
+          </div>
+          <div className="flex justify-between pt-2">
+            <button onClick={() => setRatingStep(1)} className="px-4 py-2 text-muted text-sm hover:text-bone">Back</button>
+            <button onClick={() => setRatingStep(3)} disabled={!recAccuracy}
+              className="px-6 py-2.5 bg-cinema-red text-bone font-semibold rounded-xl disabled:opacity-40 btn-press text-sm">
+              Continue
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Rating step 3: Stamp + comment */}
+      {ratingStep === 3 && (
+        <div className="space-y-4 page-enter">
+          <div className="rounded-2xl bg-surface border border-border p-6">
+            <h3 className="text-base font-bold text-bone mb-1">Give them a stamp</h3>
+            <p className="text-xs text-muted mb-4">Optional. Pick one that fits.</p>
             <div className="flex flex-wrap gap-2">
-              {REACTION_TAGS.map(tag => (
-                <ReactionChip 
-                  key={tag} 
-                  tag={tag} 
-                  selected={reaction === tag}
-                  onClick={() => setReaction(tag)}
-                />
+              {CORE_STAMPS.map(stamp => (
+                <button key={stamp} onClick={() => setSelectedStamp(selectedStamp === stamp ? null : stamp)}
+                  className={`px-3.5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider border transition-all active:scale-95 ${
+                    selectedStamp === stamp
+                      ? 'bg-cinema-red border-cinema-red text-bone'
+                      : 'bg-ink border-border text-muted hover:border-border-strong hover:text-bone'
+                  }`}>
+                  {stamp}
+                </button>
               ))}
             </div>
-          </GlassCard>
+          </div>
 
-          <GlassCard>
-            <h3 className="text-lg font-bold mb-4">Final Remarks (Optional)</h3>
-            <textarea 
-              value={comment}
-              onChange={e => setComment(e.target.value)}
-              placeholder="Leave a final verdict. Be honest, but don't end the friendship."
-              className="h-24 resize-none"
-            />
-          </GlassCard>
+          <div className="rounded-2xl bg-surface border border-border p-5">
+            <p className="text-xs font-semibold text-bone mb-2">Final take (optional)</p>
+            <textarea value={comment} onChange={e => setComment(e.target.value)}
+              placeholder="Be honest, but don't end the friendship." className="h-20 resize-none text-sm" />
+          </div>
 
-          <div className="flex justify-between pt-4">
-            <button 
-              onClick={() => setRatingStep(1)}
-              className="px-6 py-3 text-muted hover:text-soft-white transition-colors"
-            >
-              Back
-            </button>
-            <button 
-              onClick={handleSubmitRating}
-              disabled={!reaction || isSubmitting}
-              className="px-8 py-3 bg-gradient-to-r from-pink to-purple text-white font-bold rounded-xl disabled:opacity-50 btn-press flex items-center gap-2 shadow-lg shadow-pink/20"
-            >
-              {isSubmitting ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : null}
+          <div className="flex justify-between">
+            <button onClick={() => setRatingStep(2)} disabled={submitting} className="px-4 py-2 text-muted text-sm hover:text-bone">Back</button>
+            <button onClick={submitRating} disabled={submitting}
+              className="px-6 py-2.5 bg-cinema-red text-bone font-bold rounded-xl disabled:opacity-40 btn-press flex items-center gap-2 text-sm hover:bg-cinema-red/90">
+              {submitting && <div className="w-4 h-4 border-2 border-bone/30 border-t-bone rounded-full animate-spin" />}
               Submit Verdict
             </button>
           </div>

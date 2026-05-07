@@ -11,18 +11,11 @@ interface ConfidenceSliderProps {
 export default function ConfidenceSlider({ value, onChange, className = '' }: ConfidenceSliderProps) {
   const label = getConfidenceLabel(value);
 
-  const getGradientColor = () => {
-    if (value <= 30) return 'text-error';
-    if (value <= 60) return 'text-yellow';
-    if (value <= 85) return 'text-cyan';
-    return 'text-electric';
-  };
-
   return (
     <div className={`space-y-3 ${className}`}>
       <div className="flex items-center justify-between">
-        <span className="text-sm text-muted">Confidence level</span>
-        <span className={`text-sm font-bold ${getGradientColor()}`}>{value}% — {label}</span>
+        <span className="text-sm text-muted">Taste match</span>
+        <span className="text-sm font-semibold text-cinema-red">{value}% — {label}</span>
       </div>
       <input
         type="range"
@@ -31,13 +24,13 @@ export default function ConfidenceSlider({ value, onChange, className = '' }: Co
         value={value}
         onChange={e => onChange(Number(e.target.value))}
         className="w-full"
-        aria-label="Confidence score"
+        aria-label="Taste match score"
       />
-      <div className="flex justify-between text-[10px] text-muted/60">
-        <span>Risky take</span>
-        <span>I see the vision</span>
-        <span>Pretty confident</span>
-        <span>Certified banger</span>
+      <div className="flex justify-between text-xs text-muted/60">
+        <span>Low match</span>
+        <span>Possible</span>
+        <span>Strong</span>
+        <span>Perfect</span>
       </div>
     </div>
   );

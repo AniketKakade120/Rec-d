@@ -1,98 +1,104 @@
 'use client';
 
-import { Recommendation } from '@/lib/types';
-import GlassCard from './GlassCard';
-import StatusBadge from './StatusBadge';
-import UserAvatar from './UserAvatar';
-import MoodTagChip from './MoodTagChip';
+import Link from 'next/link';
+import type { Recommendation } from '@/lib/types';
 import { useApp } from '@/lib/context';
-import { useRouter } from 'next/navigation';
+import StampBadge from './StampBadge';
+import UserAvatar from './UserAvatar';
 
 interface RecommendationCardProps {
   recommendation: Recommendation;
-  onClick?: () => void;
+  compact?: boolean;
+  collapsed?: boolean;
+  groupContext?: string; // groupId — when set, links to /groups/[id]/titles/[titleId]
 }
 
-export default function RecommendationCard({ recommendation, onClick }: RecommendationCardProps) {
-  const { getUser, getTitle, currentUser } = useApp();
-  const router = useRouter();
-  
-  const sender = getUser(recommendation.recommended_by);
-  const receiver = recommendation.recommended_to_user_id ? getUser(recommendation.recommended_to_user_id) : null;
-  const title = getTitle(recommendation.title_id);
-  
-  const isReceiver = currentUser?.id === recommendation.recommended_to_user_id;
-  const isSender = currentUser?.id === recommendation.recommended_by;
+const STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  pending:    { label: 'Pending', color: 'text-muted' },
+  accepted:   { label: 'Accepted', color: 'text-bone/70' },
+  maybe_later:{ label: 'Maybe later', color: 'text-muted' },
+  not_my_vibe:{ label: 'Not my vibe', color: 'text-muted' },
+  watching:   { label: 'Watching', color: 'text-cinema-red' },
+  watched:    { label: 'Watched', color: 'text-bone/70' },
+  rated:      { label: 'Rated', color: 'text-cinema-red' },
+};
 
-  if (!sender || !title) return null;
+export default function RecommendationCard({ recommendation: rec, compact = false, collapsed = false, groupContext }: RecommendationCardProps) {
+  const { getTitle, getUser } = useApp();
+  const title = getTitle(rec.titleId);
+  const recommender = getUser(rec.recommendedBy);
+  const status = STATUS_LABELS[rec.status] || { label: rec.status, color: 'text-muted' };
 
-  const handleClick = () => {
-    if (onClick) onClick();
-    else router.push(`/recommend/${recommendation.id}`);
-  };
+  const linkHref = groupContext
+    ? `/groups/${groupContext}/titles/${rec.titleId}`
+    : `/title/${rec.titleId}?recId=${rec.id}`;
+
+  if (!title) return null;
+
+  if (collapsed) {
+    return (
+      <Link href={linkHref} className="block">
+        <div className="rounded-xl bg-surface border border-border p-3 card-hover flex items-center gap-4 group">
+          <div className={`w-10 h-14 shrink-0 ${!title.posterUrl ? `poster-gradient-${title.posterGradient}` : 'bg-surface'} rounded-md overflow-hidden relative shadow-sm`}>
+             {title.posterUrl && <img src={title.posterUrl} alt={title.title} className="absolute inset-0 w-full h-full object-cover" />}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-bold text-sm text-bone truncate">{title.title}</h3>
+            <p className="text-xs text-muted truncate">Rec&apos;d by {recommender?.displayName}</p>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-cinema-red/20 bg-cinema-red/10 ${status.color}`}>
+              {status.label}
+            </span>
+            <span className="text-muted group-hover:text-bone text-lg group-hover:translate-x-1 transition-transform">→</span>
+          </div>
+        </div>
+      </Link>
+    );
+  }
 
   return (
-    <GlassCard hover onClick={handleClick} className="relative overflow-hidden group">
-      {/* Background hint of poster gradient */}
-      <div className={`absolute -right-20 -top-20 w-40 h-40 blur-3xl opacity-20 rounded-full poster-gradient-${title.poster_gradient}`} />
-      
-      <div className="flex justify-between items-start mb-4 relative z-10">
-        <div className="flex items-center gap-2">
-          <UserAvatar name={sender.display_name} size="sm" />
-          <div className="text-sm">
-            <span className="font-medium text-soft-white">{sender.display_name}</span>
-            <span className="text-muted"> to </span>
-            <span className="font-medium text-soft-white">
-              {recommendation.recommended_to_group ? 'the group' : receiver?.display_name || 'someone'}
-            </span>
-          </div>
-        </div>
-        <StatusBadge status={recommendation.status} />
-      </div>
-
-      <div className="flex gap-4 relative z-10">
-        <div className={`w-16 h-24 sm:w-20 sm:h-30 shrink-0 rounded-lg overflow-hidden poster-gradient-${title.poster_gradient}`}>
-          {title.poster_url && (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img src={title.poster_url} alt={title.title} className="w-full h-full object-cover" />
+    <Link href={linkHref} className="block">
+      <div className="rounded-xl bg-surface border border-border p-4 card-hover flex gap-3 group">
+        <div className={`w-[100px] sm:w-[120px] shrink-0 ${!title.posterUrl ? `poster-gradient-${title.posterGradient}` : 'bg-surface'} relative aspect-[2/3] rounded-lg overflow-hidden`}>
+          {title.posterUrl && (
+            <img src={title.posterUrl} alt={title.title} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
           )}
+          <div className="absolute inset-0 bg-gradient-to-t from-ink/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
-        
-        <div className="flex-grow flex flex-col min-w-0">
-          <h3 className="font-bold text-lg leading-tight truncate mb-1">{title.title}</h3>
-          <p className="text-xs text-muted mb-2">{title.release_year} • {title.type}</p>
-          
-          <div className="bg-surface/50 border border-border/50 rounded-lg p-3 text-sm italic text-soft-white/80 line-clamp-2 mt-auto relative">
-            <span className="absolute -top-2 -left-1 text-2xl text-muted/30 leading-none">"</span>
-            {recommendation.reason}
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <h3 className="font-semibold text-sm text-bone truncate">{title.title}</h3>
+            {rec.primaryStamp && <StampBadge stamp={rec.primaryStamp} size="xs" />}
+          </div>
+
+          <p className="text-xs text-muted mb-1.5 truncate">
+            {title.releaseYear} · {title.genres.slice(0, 2).join(', ')}
+            {title.runtime && ` · ${title.runtime}`}
+          </p>
+
+          {recommender && (
+            <div className="flex items-center gap-1.5 mb-1.5 min-w-0">
+              <UserAvatar name={recommender.displayName} size="xs" />
+              <span className="text-xs text-muted truncate">
+                <span className="text-bone/60">{recommender.displayName}</span> recommended
+              </span>
+            </div>
+          )}
+
+          {!compact && rec.reason && (
+            <p className="text-sm text-muted/80 italic line-clamp-1 mb-2">&ldquo;{rec.reason}&rdquo;</p>
+          )}
+
+          <div className="flex items-center gap-3">
+            <span className={`text-sm font-semibold uppercase tracking-wider ${status.color}`}>{status.label}</span>
+            {rec.tasteMatchScore && (
+              <span className="text-sm text-muted">{rec.tasteMatchScore}% match</span>
+            )}
           </div>
         </div>
       </div>
-
-      <div className="mt-4 flex flex-wrap gap-2 relative z-10">
-        {recommendation.mood_tags.slice(0, 3).map(tag => (
-          <MoodTagChip key={tag} tag={tag} />
-        ))}
-      </div>
-      
-      {isReceiver && recommendation.status === 'pending' && (
-        <div className="mt-4 grid grid-cols-2 gap-2 relative z-10">
-          <button className="py-2 bg-electric text-white font-medium rounded-xl text-sm btn-press hover:bg-electric/90">
-            Accept
-          </button>
-          <button className="py-2 bg-surface border border-border font-medium rounded-xl text-sm btn-press hover:bg-surface-hover">
-            Not my vibe
-          </button>
-        </div>
-      )}
-      
-      {isReceiver && recommendation.status === 'watched' && (
-        <div className="mt-4 relative z-10">
-          <button className="w-full py-2 bg-gradient-to-r from-pink to-purple text-white font-medium rounded-xl text-sm btn-press opacity-90 hover:opacity-100">
-            Rate Recommendation
-          </button>
-        </div>
-      )}
-    </GlassCard>
+    </Link>
   );
 }

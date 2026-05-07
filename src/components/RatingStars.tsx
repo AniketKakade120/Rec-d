@@ -30,7 +30,7 @@ export default function RatingStars({ value, onChange, readonly = false, size = 
             disabled={readonly}
             className={`${sizes[size]} transition-all ${
               readonly ? 'cursor-default' : 'cursor-pointer btn-press hover:scale-110'
-            } ${filled ? 'text-yellow' : 'text-border'}`}
+            } ${filled ? 'text-cinema-red' : 'text-border'}`}
             onClick={() => onChange?.(star)}
             onMouseEnter={() => !readonly && setHovered(star)}
             onMouseLeave={() => !readonly && setHovered(0)}

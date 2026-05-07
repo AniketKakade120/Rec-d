@@ -7,11 +7,14 @@ import PageHeader from '@/components/PageHeader';
 import RecommendationCard from '@/components/RecommendationCard';
 import UserAvatar from '@/components/UserAvatar';
 import EmptyState from '@/components/EmptyState';
+import InviteModal from '@/components/InviteModal';
+import StampBadge from '@/components/StampBadge';
 
 export default function GroupDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const { getGroup, getGroupMembers, getGroupRecommendations } = useApp();
   const [filter, setFilter] = useState<'all' | 'pending' | 'watched'>('all');
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   const group = getGroup(resolvedParams.id);
   const members = getGroupMembers(resolvedParams.id);
@@ -28,84 +31,62 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
   });
 
   return (
-    <div className="space-y-8">
-      <PageHeader 
-        title={group.name} 
-        subtitle={group.vibe}
-        backButton
-        action={
-          <Link 
-            href={`/recommend?groupId=${group.id}`}
-            className="px-4 py-2 bg-electric text-white rounded-lg text-sm font-medium hover:bg-electric/90 transition-colors btn-press inline-block shadow-lg shadow-electric/20"
-          >
-            Recommend to Group
-          </Link>
-        }
-      />
+    <div className="space-y-6">
+      <PageHeader title={group.name} subtitle={group.vibe} backButton action={
+        <div className="flex gap-2">
+          <button onClick={() => setInviteOpen(true)} className="px-3 py-1.5 bg-surface border border-border text-bone/70 rounded-lg text-xs font-medium hover:bg-surface-hover btn-press">Invite</button>
+          <Link href={`/recommend?groupId=${group.id}`} className="px-3 py-1.5 bg-cinema-red text-bone rounded-lg text-xs font-semibold hover:bg-cinema-red/90 btn-press inline-block">Rec to Group</Link>
+        </div>
+      } />
 
+      {/* Group badge */}
+      <div className="flex items-center gap-3">
+        <StampBadge stamp="Crew Pick" size="md" />
+        {group.description && <p className="text-xs text-muted">{group.description}</p>}
+      </div>
+
+      {/* Members */}
       <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold">Members ({members.length})</h2>
-          <button className="text-sm text-electric hover:underline">Invite code: {group.invite_code}</button>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-bone">Members ({members.length})</h2>
+          <button onClick={() => setInviteOpen(true)} className="text-xs text-cinema-red hover:text-cinema-red/80">Invite code: {group.invite_code}</button>
         </div>
         <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
           {members.map(member => (
-            <div key={member.id} className="flex flex-col items-center gap-1 shrink-0 w-16">
-              <UserAvatar name={member.display_name} size="lg" />
-              <span className="text-[10px] text-muted truncate w-full text-center">{member.display_name}</span>
+            <div key={member.id} className="flex flex-col items-center gap-1 shrink-0 w-14">
+              <UserAvatar name={member.displayName} size="lg" />
+              <span className="text-sm text-muted truncate w-full text-center">{member.displayName}</span>
             </div>
           ))}
-          <button className="flex flex-col items-center gap-1 shrink-0 w-16 group">
-            <div className="w-12 h-12 rounded-full border border-dashed border-border flex items-center justify-center text-muted group-hover:border-electric group-hover:text-electric transition-colors">
-              +
-            </div>
-            <span className="text-[10px] text-muted group-hover:text-electric transition-colors">Add</span>
+          <button onClick={() => setInviteOpen(true)} className="flex flex-col items-center gap-1 shrink-0 w-14 group">
+            <div className="w-12 h-12 rounded-full border border-dashed border-border flex items-center justify-center text-muted group-hover:border-cinema-red group-hover:text-cinema-red transition-colors">+</div>
+            <span className="text-sm text-muted group-hover:text-cinema-red transition-colors">Add</span>
           </button>
         </div>
       </section>
 
-      <section>
-        <div className="flex items-center gap-2 mb-6 overflow-x-auto hide-scrollbar border-b border-border pb-2">
-          <button 
-            onClick={() => setFilter('all')}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${filter === 'all' ? 'bg-surface text-soft-white' : 'text-muted hover:text-soft-white'}`}
-          >
-            All Activity
+      {/* Filters */}
+      <div className="flex gap-1.5 border-b border-border pb-2">
+        {(['all', 'pending', 'watched'] as const).map(f => (
+          <button key={f} onClick={() => setFilter(f)}
+            className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors capitalize ${filter === f ? 'bg-surface text-bone' : 'text-muted hover:text-bone'}`}>
+            {f === 'all' ? 'All' : f === 'pending' ? 'Pending' : 'Watched'}
           </button>
-          <button 
-            onClick={() => setFilter('pending')}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${filter === 'pending' ? 'bg-surface text-soft-white' : 'text-muted hover:text-soft-white'}`}
-          >
-            Pending
-          </button>
-          <button 
-            onClick={() => setFilter('watched')}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${filter === 'watched' ? 'bg-surface text-soft-white' : 'text-muted hover:text-soft-white'}`}
-          >
-            Watched & Rated
-          </button>
-        </div>
+        ))}
+      </div>
 
-        {recommendations.length > 0 ? (
-          <div className="space-y-4">
-            {recommendations.map(rec => (
-              <RecommendationCard key={rec.id} recommendation={rec} />
-            ))}
-          </div>
-        ) : (
-          <div className="py-12 text-center border border-dashed border-border rounded-2xl bg-surface/30">
-            <p className="text-muted mb-4">No recommendations found for this filter.</p>
-            {filter === 'all' && (
-              <Link 
-                href={`/recommend?groupId=${group.id}`}
-                className="text-electric font-medium hover:underline"
-              >
-                Be the first to recommend something
-              </Link>
-            )}
-          </div>
-        )}
-      </section>
+      {/* Recommendations */}
+      {recommendations.length > 0 ? (
+        <div className="space-y-3">
+          {recommendations.map(rec => <RecommendationCard key={rec.id} recommendation={rec} groupContext={resolvedParams.id} />)}
+        </div>
+      ) : (
+        <EmptyState title="No recs yet" description="Be the first to recommend something." inviteCta action={
+          <Link href={`/recommend?groupId=${group.id}`} className="text-cinema-red font-medium hover:text-cinema-red/80 text-sm">Recommend something →</Link>
+        } />
+      )}
+
+      <InviteModal isOpen={inviteOpen} onClose={() => setInviteOpen(false)} groupName={group.name} />
     </div>
   );
 }

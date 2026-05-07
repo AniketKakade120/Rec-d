@@ -1,21 +1,9 @@
-// TODO: Replace with actual Supabase client when keys are available
-// import { createBrowserClient } from '@supabase/ssr'
+import { createBrowserClient } from '@supabase/ssr'
 
-/**
- * Supabase Client (Browser)
- * 
- * When Supabase keys are available, uncomment and configure:
- * 
- * export const supabase = createBrowserClient(
- *   process.env.NEXT_PUBLIC_SUPABASE_URL!,
- *   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
- * )
- */
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-export const isSupabaseConfigured = !!(SUPABASE_URL && SUPABASE_KEY);
+export const isSupabaseConfigured = !!(
+  process.env.NEXT_PUBLIC_SUPABASE_URL && 
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
 if (!isSupabaseConfigured) {
   console.log(
@@ -24,5 +12,14 @@ if (!isSupabaseConfigured) {
   );
 }
 
-// Placeholder export - replace with real client
-export const supabase = null;
+export function createClient() {
+  if (!isSupabaseConfigured) {
+    return null;
+  }
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
+
+export const supabase = createClient();
